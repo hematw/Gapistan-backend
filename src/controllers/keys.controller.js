@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import EncryptedChatKeys from "../models/EncryptedChatKeys";
+import EncryptedChatKeys from "../models/EncryptedChatKey.js";
 
 export const getGroupAesKey = asyncHandler(async (req, res) => {
     const { groupId } = req.params;

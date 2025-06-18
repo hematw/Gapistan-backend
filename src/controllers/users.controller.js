@@ -124,3 +124,17 @@ export const getPublicKey = asyncHandler(async (req, res) => {
     }
     res.json({ publicKey: user.publicKey });
 });
+
+export const uploadRSAPublicKey = asyncHandler(async (req, res) => {
+  const { rsaPublicKey } = req.body;
+
+  if (!rsaPublicKey) {
+    return res.status(400).json({ error: "RSA public key missing" });
+  }
+
+  const user = await User.findById(req.user.id);
+  user.rsaPublicKey = rsaPublicKey;
+  await user.save();
+
+  res.json({ success: true });
+});

@@ -7,6 +7,8 @@ import FilesAndMedia from "../models/FileAndMedia.js";
 import formatChatDate from "../utils/formate-date.js";
 import { io, userSockets } from "../utils/socket.js";
 import generateEventMessage from "../utils/generateEventMessage.js";
+import { webcrypto as crypto } from "crypto";
+import EncryptedChatKey from "../models/EncryptedChatKey.js";
 
 // await Event.create({
 //     type: "user_joined",
@@ -331,41 +333,76 @@ export const uploadFiles = async (req, res) => {
 };
 
 export const createGroup = asyncHandler(async (req, res) => {
-    const { chatName, members: members } = req.body;
+  const { chatName, members } = req.body;
 
-    if (!chatName || members.length < 2) {
-        return res
-            .status(400)
-            .json({ error: "Group needs a name and at least 3 members" });
+  if (!chatName || members.length < 2) {
+    return res
+      .status(400)
+      .json({ error: "Group needs a name and at least 3 members" });
+  }
+
+  const createdBy = req.user.id;
+  let profilePath = req.file ? `/uploads/${req.file.filename}` : undefined;
+
+  const groupChat = await Chat.create({
+    chatName,
+    isGroup: true,
+    members: [...members, createdBy],
+    createdBy,
+    groupAdmins: [createdBy],
+    profile: profilePath,
+  });
+
+  // 🔑 Step 1: Generate AES key (raw 256-bit)
+  const rawAESKey = crypto.getRandomValues(new Uint8Array(32)); // 256-bit
+
+  // 🔁 Step 2: Encrypt AES key for each user
+  const createdGroup = await Chat.findById(groupChat._id).populate("members");
+
+  const encryptedKeyDocs = [];
+
+  for (const member of createdGroup.members) {
+    if (member.rsaPublicKey) {
+      const importedRSAKey = await crypto.subtle.importKey(
+        "jwk",
+        member.rsaPublicKey,
+        {
+          name: "RSA-OAEP",
+          hash: "SHA-256",
+        },
+        true,
+        ["encrypt"]
+      );
+
+      const encryptedGroupKey = await crypto.subtle.encrypt(
+        { name: "RSA-OAEP" },
+        importedRSAKey,
+        rawAESKey
+      );
+
+      encryptedKeyDocs.push({
+        chat: createdGroup._id,
+        user: member._id,
+        key: Buffer.from(encryptedGroupKey),
+      });
     }
+  }
 
-    const createdBy = req.user.id;
+  // 🚀 Bulk insert all at once
+  if (encryptedKeyDocs.length > 0) {
+    await EncryptedChatKey.insertMany(encryptedKeyDocs);
+  }
 
-    let path;
-    if (req.file) {
-        path = `/uploads/${req.file.filename}`;
+  // 📢 Notify members (optional)
+  for (const member of createdGroup.members) {
+    const memberSocket = userSockets[member?._id.toString()];
+    if (memberSocket) {
+      memberSocket.join(groupChat._id);
+      io.to(groupChat._id).emit("new-chat", groupChat);
     }
+  }
 
-    const groupChat = await Chat.create({
-        chatName,
-        isGroup: true,
-        members: [...members, req.user.id],
-        createdBy,
-        groupAdmins: [createdBy],
-        profile: path,
-    });
-
-    for (const member of groupChat.members) {
-        const memberSocket = userSockets[member.toString()];
-        console.log("MMMMMMM", member);
-        if (memberSocket) {
-            console.log("LLLLLL", memberSocket);
-            memberSocket.join(groupChat._id);
-            io.to(groupChat._id).emit("new-chat", groupChat);
-        }
-    }
-
-    res.status(201).json(groupChat);
+  res.status(201).json(groupChat);
 });
 
 export const getChatFilesAndMedia = asyncHandler(async (req, res) => {

@@ -56,6 +56,9 @@ const UserSchema = new mongoose.Schema(
         },
         publicKey: {
             type: Object,
+        },
+        rsaPublicKey: {
+            type: Object,
         }
     },
     {
