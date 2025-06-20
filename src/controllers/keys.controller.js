@@ -6,16 +6,27 @@ export const getGroupAesKey = asyncHandler(async (req, res) => {
     const user = req.user;
 
     if (!groupId) {
-        return res.status(400).send({ message: "Please provide the groupId params" })
+        return res
+            .status(400)
+            .send({ message: "Please provide the groupId params" });
     }
 
-    const groupAesKey = await EncryptedChatKeys.findOne({ chat: groupId, user: user.id || user._id })
+    const groupAesKey = await EncryptedChatKeys.findOne({
+        chat: groupId,
+        user: user.id || user._id,
+    });
+
     if (!groupAesKey) {
-        return res.status(404).json({ message: "Key not found for chat" })
+        return res.status(404).json({ message: "Key not found for chat" });
     }
 
-    res.status(200).json({ key: groupAesKey })
-})
+    res.json({
+        chat: groupAesKey.chat,
+        user: groupAesKey.user,
+        key: groupAesKey.key.toString("base64"), // 👈 Important
+    });
+});
+
 
 export const addGroupAesKey = asyncHandler(async (req, res) => {
     const { groupId } = req.params;
