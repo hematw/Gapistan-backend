@@ -138,3 +138,12 @@ export const uploadRSAPublicKey = asyncHandler(async (req, res) => {
 
   res.json({ success: true });
 });
+
+export const getUsersForDropdown = asyncHandler(async (req, res) => {
+  const users = await User.find({_id: { $ne: req.user.id } })
+    .select("username email firstName lastName")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return res.status(200).json({users});
+});
