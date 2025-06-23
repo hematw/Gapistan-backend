@@ -18,6 +18,7 @@
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
     "jsonwebtoken": "^9.0.2",
+    "livekit-server-sdk": "^2.13.0",
     "mongoose": "^8.13.2",
     "mongoose-findorcreate": "^4.0.0",
     "morgan": "^1.10.0",
