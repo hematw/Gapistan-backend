@@ -28,6 +28,42 @@ export default function initSocket(server) {
         socket.on("send-message", (...args) => handleSendMessage(socket, ...args));
         socket.on("message-delivered", (...args) => handleMessageDelivery(socket, ...args));
         socket.on("message-seen", (...args) => handleMessageSeen(socket, ...args));
+        socket.onAny((eventName, args) => {
+            console.log(eventName, args);
+        });
+
+        socket.on('start-call', ({ toUserId, fromUserId, roomName }) => {
+            const targetSocketId = userSockets[toUserId];
+            if (targetSocketId) {
+                console.log(`Starting call from ${fromUserId} to ${toUserId} in room ${roomName}`);
+                targetSocketId.emit('incoming-call', {
+                    fromUserId,
+                    roomName,
+                });
+            }
+        });
+
+        socket.on('call-rejected', ({ toUserId, roomName }) => {
+            const callerSocket = userSockets[toUserId];
+            if (callerSocket) {
+                callerSocket.emit('call-rejected', { roomName });
+            }
+        });
+
+        socket.on('accept-call', ({ toUserId, roomName }) => {
+            const callerSocket = userSockets[toUserId];
+            if (callerSocket) {
+                callerSocket.emit('call-accepted', { roomName });
+            }
+        });
+
+        socket.on('call-timeout', ({ toUserId, roomName }) => {
+            const receiverSocket = userSockets[toUserId];
+            if (receiverSocket) {
+                receiverSocket.emit('call-timeout', { roomName });
+            }
+        });
+
     });
 }
 
