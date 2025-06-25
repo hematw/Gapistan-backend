@@ -32,14 +32,22 @@ export default function initSocket(server) {
             console.log(eventName, args);
         });
 
-        socket.on('start-call', ({ toUserId, fromUserId, roomName }) => {
-            const targetSocketId = userSockets[toUserId];
-            if (targetSocketId) {
-                console.log(`Starting call from ${fromUserId} to ${toUserId} in room ${roomName}`);
-                targetSocketId.emit('incoming-call', {
+        socket.on('start-call', ({ toUserId, fromUserId, roomName, isGroup }) => {
+            if (isGroup) {
+                socket.to(roomName).emit('incoming-call', {
                     fromUserId,
                     roomName,
                 });
+            } else {
+
+                const targetSocketId = userSockets[toUserId];
+                if (targetSocketId) {
+                    console.log(`Starting call from ${fromUserId} to ${toUserId} in room ${roomName}`);
+                    targetSocketId.emit('incoming-call', {
+                        fromUserId,
+                        roomName,
+                    });
+                }
             }
         });
 

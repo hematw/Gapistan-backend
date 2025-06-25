@@ -435,7 +435,7 @@ export const getChatMembers = asyncHandler(async (req, res) => {
 
     const chat = await Chat.findById(chatId).populate(
         "members",
-        "firstName lastName username email profile bio isOnline lastSeen"
+        "firstName lastName username email profile bio isOnline lastSeen publicKey rsaPublicKey"
     );
 
     if (!chat) {
