@@ -203,11 +203,11 @@ const handleMarsAsSeen = async (socket, { chatId, userId }) => {
 }
 
 const handleSendMessage = async (socket,
-    { chatId, text, files = [], reactions, senderId, receiverId, replayTo, iv },
+    { chatId, text, files = [], reactions, senderId, receiverId, replyTo, iv },
     cb
 ) => {
     // const { chatId, text, mediaType, reactions, userId } = data;
-    console.log("Message received:", chatId, text, files, reactions, senderId, receiverId, replayTo, iv);
+    console.log("Message received:", chatId, text, files, reactions, senderId, receiverId, replyTo, iv);
     try {
         let chatToSendMessage;
 
@@ -230,6 +230,9 @@ const handleSendMessage = async (socket,
             console.log(chatToSendMessage)
             chatToSendMessage = doc;
 
+            chatToSendMessage = await Chat.findById(chatToSendMessage._id)
+                .populate("members", "_id firstName lastName username profile")
+
             if (created) {
                 const senderUser = await User.findById(senderId);
                 const receiverUser = await User.findById(receiverId);
@@ -242,6 +245,7 @@ const handleSendMessage = async (socket,
                             ...chatToSendMessage.toJSON(),
                             profile: meOrOther.profile,
                             chatName: meOrOther.firstName ? `${meOrOther.firstName} ${meOrOther.lastName}` : meOrOther.username,
+                            senderId
 
                         })
                     }
@@ -260,7 +264,7 @@ const handleSendMessage = async (socket,
             chat: chatToSendMessage._id,
             text,
             files: files.map((file) => file._id),
-            replayTo,
+            replyTo,
             reactions: reactions || [],
             iv: iv
         });
@@ -278,8 +282,6 @@ const handleSendMessage = async (socket,
                 files,
             })
         } else {
-
-
             let otherUser = chatToSendMessage.members.find(
                 (p) => p._id.toString() !== senderId
             );

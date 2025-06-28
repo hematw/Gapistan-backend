@@ -86,7 +86,7 @@ export const uploadPublicKey = asyncHandler(async (req, res) => {
     let { publicKey } = req.body;
 
     if (!publicKey) {
-        return res.status(400).json({ error: "Missing publicKey" });
+        return res.status(400).json({ message: "Missing publicKey" });
     }
 
     // Handle stringified keys (just in case)
@@ -94,7 +94,7 @@ export const uploadPublicKey = asyncHandler(async (req, res) => {
         try {
             publicKey = JSON.parse(publicKey);
         } catch {
-            return res.status(400).json({ error: "Invalid publicKey format" });
+            return res.status(400).json({ message: "Invalid publicKey format" });
         }
     }
 
@@ -102,13 +102,13 @@ export const uploadPublicKey = asyncHandler(async (req, res) => {
     const isValid = requiredFields.every(field => field in publicKey);
 
     if (!isValid) {
-        return res.status(400).json({ error: "publicKey missing required fields" });
+        return res.status(400).json({ message: "publicKey missing required fields" });
     }
 
     const user= await User.findByIdAndUpdate(req.user.id, { publicKey });
 
     if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ message: "User not found" });
     }
 
     res.json({ success: true, user });
@@ -117,10 +117,14 @@ export const uploadPublicKey = asyncHandler(async (req, res) => {
 
 // GET /users/:id/public-key
 export const getPublicKey = asyncHandler(async (req, res) => {
+    const {id} = req.params;
+    if(!id){
+        return res.status(400).json({message: "User ID is required"});
+    }
     const user = await User.findById(req.params.id).select("publicKey");
 
     if (!user || !user.publicKey) {
-        return res.status(404).json({ error: "Public key Not found" });
+        return res.status(404).json({ message: "User or public key was NOT found" });
     }
     res.json({ publicKey: user.publicKey });
 });
@@ -129,7 +133,7 @@ export const uploadRSAPublicKey = asyncHandler(async (req, res) => {
   const { rsaPublicKey } = req.body;
 
   if (!rsaPublicKey) {
-    return res.status(400).json({ error: "RSA public key missing" });
+    return res.status(400).json({ message: "RSA public key missing" });
   }
 
   const user = await User.findById(req.user.id);

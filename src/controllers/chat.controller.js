@@ -60,19 +60,28 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chat = await Chat.findById(chatId)
-        .populate("members", "fullName email profile")
+        .populate("members", "firstName lastName  email profile")
         .populate("lastMessage");
 
     if (!chat) {
-        return res.status(404).json({ error: "Chat not found" });
+        return res.status(404).json({ message: "Chat not found" });
     }
 
     const messages = await Message.find({ chat: chatId })
         .sort({ createdAt: 1 })
         .limit(20)
-        .populate("files")
-        .populate("sender", "firstName lastName username email profile _id")
+        .populate([
+            { path: "files" },
+            {
+                path: "replyTo", populate: [
+                    { path: "sender", select: "firstName lastName username email profile _id" },
+                    { path: "files" }
+                ]
+            },
+            { path: "sender", select: "firstName lastName username email profile _id" },
+        ])
         .lean();
+
 
     const events = await Event.find({ chat: chat._id })
         .populate("createdBy", "firstName lastName username")
@@ -168,7 +177,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     console.log(req.body);
 
     if (!content && !req.files) {
-        return res.status(400).json({ error: "Content or media is required" });
+        return res.status(400).json({ message: "Content or media is required" });
     }
 
     let chatToSendMessage = await Chat.findOne({
@@ -177,7 +186,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     });
 
     if (!chatToSendMessage) {
-        return res.status(404).json({ error: "Chat not found" });
+        return res.status(404).json({ message: "Chat not found" });
     }
 
     let mediaUrl = null;
@@ -221,7 +230,7 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
     const message = await Message.findOneAndDelete({ _id: id, sender: userId });
     if (!message) {
-        return res.status(404).json({ error: "Message not found" });
+        return res.status(404).json({ message: "Message not found" });
     }
 });
 
@@ -229,51 +238,129 @@ export const searchForChats = asyncHandler(async (req, res) => {
     const { query } = req.query;
     const userId = req.user.id;
 
-    const chats = await Chat.find({
-        members: userId,
-        $or: [
-            { chatName: { $regex: query, $options: "i" } },
-            {
-                members: { $elemMatch: { fullName: { $regex: query, $options: "i" } } },
+    // 1️⃣ Step 1: Search group chats by name
+    const groupChats = await Chat.aggregate([
+        {
+            $match: {
+                isGroup: true,
+                members: userId,
+                chatName: { $regex: query, $options: "i" },
             },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "members",
+                foreignField: "_id",
+                as: "members",
+            },
+        },
+        {
+            $lookup: {
+                from: "messages",
+                localField: "lastMessage",
+                foreignField: "_id",
+                as: "lastMessage",
+            },
+        },
+        {
+            $unwind: {
+                path: "$lastMessage",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $project: {
+                chatName: 1,
+                isGroup: 1,
+                members: {
+                    _id: 1,
+                    firstName: 1,
+                    lastName: 1,
+                    email: 1,
+                    profile: 1,
+                    status: 1,
+                    lastSeen: 1,
+                },
+                lastMessage: 1,
+                updatedAt: 1,
+                createdAt: 1,
+            },
+        },
+    ]);
+
+    // 2️⃣ Step 2: Search users by query
+    const matchingUsers = await User.find({
+        _id: { $ne: userId },
+        $or: [
+            { firstName: { $regex: query, $options: "i" } },
+            { lastName: { $regex: query, $options: "i" } },
+            { username: { $regex: query, $options: "i" } },
         ],
     })
-        .populate("members", "fullName email profile status lastSeen")
-        .populate("lastMessage");
-
-    const otherResults = await User.find({
-        _id: { $ne: userId },
-        username: { $regex: query, $options: "i" },
-    })
-        .select("-password -__v")
+        .select("_id email profile username firstName lastName status lastSeen")
         .lean();
 
-    const formattedChats = chats.map((chat) => {
-        if (!chat.isGroup) {
-            const otherUser = chat.members.find((p) => p._id.toString() !== userId);
-            return {
-                ...chat.toJSON(),
-                chatName: otherUser.fullName,
-                profile: otherUser.profile,
-            };
+    const matchingUserIds = matchingUsers.map((u) => u._id.toString());
+
+    // 3️⃣ Step 3: For each matching user, check if a 1-1 chat exists
+    const existingOneToOneChats = await Chat.find({
+        isGroup: false,
+        members: { $all: [userId], $size: 2 },
+    })
+        .populate("members", "firstName lastName email profile username")
+        .populate("lastMessage")
+        .lean();
+
+    const oneToOneChatMap = new Map();
+
+    existingOneToOneChats.forEach((chat) => {
+        const otherUser = chat.members.find(
+            (m) => m._id.toString() !== userId
+        );
+        if (otherUser) {
+            // Add chatName and profile directly to chat
+            chat.chatName = otherUser.firstName ? `${otherUser.firstName} ${otherUser.lastName}` : otherUser.username;
+            chat.profile = otherUser.profile;
+            oneToOneChatMap.set(otherUser._id.toString(), chat);
         }
-        return chat;
     });
 
-    const formattedOtherResults = otherResults.map((user) => {
-        return {
-            ...user,
-            chatName: user.firstName
-                ? `${user.firstName} ${user.lastName}`
-                : user.username,
-            profile: user.profile,
-        };
-    });
 
-    res
-        .status(200)
-        .json({ chats: formattedChats, otherResults: formattedOtherResults });
+    // Filter out users with existing chats
+    const filteredUsers = matchingUsers.filter(
+        (u) => !oneToOneChatMap.has(u._id.toString())
+    );
+
+    const otherResults = filteredUsers.map((user) => ({
+        ...user,
+        chatName: user.firstName
+            ? `${user.firstName} ${user.lastName}`
+            : user.username,
+        profile: user.profile,
+    }));
+
+    // Add 1:1 chats (that matched user names)
+    const oneToOneChats = [];
+
+    for (const user of matchingUsers) {
+        const chat = oneToOneChatMap.get(user._id.toString());
+        if (chat) {
+            oneToOneChats.push(chat);
+        }
+    }
+
+    // ✅ Final Combined Response
+    const allChats = [...groupChats, ...oneToOneChats];
+
+    res.status(200).json({
+        chats: allChats,
+        otherResults,
+    });
 });
+
+
+
 
 const mediaMimeMap = {
     image: ["image/jpeg", "image/png", "image/webp", "image/gif"],
@@ -287,7 +374,7 @@ export const uploadFiles = async (req, res) => {
     const chat = req.params.chatId;
     try {
         if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: "No files uploaded." });
+            return res.status(400).json({ message: "No files uploaded." });
         }
 
         const filesToSave = [];
@@ -302,7 +389,7 @@ export const uploadFiles = async (req, res) => {
             if (!mediaType) {
                 return res
                     .status(400)
-                    .json({ error: `Unsupported file type: ${file.originalname}` });
+                    .json({ message: `Unsupported file type: ${file.originalname}` });
             }
 
             if (!chat) {
@@ -328,81 +415,81 @@ export const uploadFiles = async (req, res) => {
         });
     } catch (err) {
         console.error("File upload error:", err);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ message: "Internal server error" });
     }
 };
 
 export const createGroup = asyncHandler(async (req, res) => {
-  const { chatName, members } = req.body;
+    const { chatName, members } = req.body;
 
-  if (!chatName || members.length < 2) {
-    return res
-      .status(400)
-      .json({ error: "Group needs a name and at least 3 members" });
-  }
-
-  const createdBy = req.user.id;
-  let profilePath = req.file ? `/uploads/${req.file.filename}` : undefined;
-
-  const groupChat = await Chat.create({
-    chatName,
-    isGroup: true,
-    members: [...members, createdBy],
-    createdBy,
-    groupAdmins: [createdBy],
-    profile: profilePath,
-  });
-
-  // 🔑 Step 1: Generate AES key (raw 256-bit)
-  const rawAESKey = crypto.getRandomValues(new Uint8Array(32)); // 256-bit
-
-  // 🔁 Step 2: Encrypt AES key for each user
-  const createdGroup = await Chat.findById(groupChat._id).populate("members");
-
-  const encryptedKeyDocs = [];
-
-  for (const member of createdGroup.members) {
-    if (member.rsaPublicKey) {
-      const importedRSAKey = await crypto.subtle.importKey(
-        "jwk",
-        member.rsaPublicKey,
-        {
-          name: "RSA-OAEP",
-          hash: "SHA-256",
-        },
-        true,
-        ["encrypt"]
-      );
-
-      const encryptedGroupKey = await crypto.subtle.encrypt(
-        { name: "RSA-OAEP" },
-        importedRSAKey,
-        rawAESKey
-      );
-
-      encryptedKeyDocs.push({
-        chat: createdGroup._id,
-        user: member._id,
-        key: Buffer.from(encryptedGroupKey),
-      });
+    if (!chatName || members.length < 2) {
+        return res
+            .status(400)
+            .json({ message: "Group needs a name and at least 3 members" });
     }
-  }
 
-  // 🚀 Bulk insert all at once
-  if (encryptedKeyDocs.length > 0) {
-    await EncryptedChatKey.insertMany(encryptedKeyDocs);
-  }
+    const createdBy = req.user.id;
+    let profilePath = req.file ? `/uploads/${req.file.filename}` : undefined;
 
-  // 📢 Notify members (optional)
-  for (const member of createdGroup.members) {
-    const memberSocket = userSockets[member?._id.toString()];
-    if (memberSocket) {
-      memberSocket.join(groupChat._id);
-      io.to(groupChat._id).emit("new-chat", groupChat);
+    const groupChat = await Chat.create({
+        chatName,
+        isGroup: true,
+        members: [...members, createdBy],
+        createdBy,
+        groupAdmins: [createdBy],
+        profile: profilePath,
+    });
+
+    // 🔑 Step 1: Generate AES key (raw 256-bit)
+    const rawAESKey = crypto.getRandomValues(new Uint8Array(32)); // 256-bit
+
+    // 🔁 Step 2: Encrypt AES key for each user
+    const createdGroup = await Chat.findById(groupChat._id).populate("members");
+
+    const encryptedKeyDocs = [];
+
+    for (const member of createdGroup.members) {
+        if (member.rsaPublicKey) {
+            const importedRSAKey = await crypto.subtle.importKey(
+                "jwk",
+                member.rsaPublicKey,
+                {
+                    name: "RSA-OAEP",
+                    hash: "SHA-256",
+                },
+                true,
+                ["encrypt"]
+            );
+
+            const encryptedGroupKey = await crypto.subtle.encrypt(
+                { name: "RSA-OAEP" },
+                importedRSAKey,
+                rawAESKey
+            );
+
+            encryptedKeyDocs.push({
+                chat: createdGroup._id,
+                user: member._id,
+                key: Buffer.from(encryptedGroupKey),
+            });
+        }
     }
-  }
 
-  res.status(201).json(groupChat);
+    // 🚀 Bulk insert all at once
+    if (encryptedKeyDocs.length > 0) {
+        await EncryptedChatKey.insertMany(encryptedKeyDocs);
+    }
+
+    // 📢 Notify members (optional)
+    for (const member of createdGroup.members) {
+        const memberSocket = userSockets[member?._id.toString()];
+        if (memberSocket) {
+            memberSocket.join(groupChat._id);
+            io.to(groupChat._id).emit("new-chat", groupChat);
+        }
+    }
+
+    res.status(201).json(groupChat);
 });
 
 export const getChatFilesAndMedia = asyncHandler(async (req, res) => {
@@ -691,7 +778,7 @@ export const editGroupChat = asyncHandler(async (req, res) => {
     });
 
     // Emit using a more semantically correct event name
-    io.to(chatId).emit("group-event", {event:{...event.toObject(), contentType: "event"}, chat: updatedChat});
+    io.to(chatId).emit("group-event", { event: { ...event.toObject(), contentType: "event" }, chat: updatedChat });
 
     res.status(200).json({
         message: "Group chat updated successfully.",

@@ -14,7 +14,7 @@ const authHandler = (
         token = authHeader?.split(" ")[1];
     }
     if (!process.env.JWT_SECRET) {
-        return res.status(500).json({ error: "No JWT secret provided" });
+        return res.status(500).json({ message: "No JWT secret provided" });
     }
 
     if (token) {
@@ -22,10 +22,10 @@ const authHandler = (
             const decoded = jwt.verify(token, JWT_SECRET);
             req.user = decoded;
         } catch (err) {
-            return res.status(401).json({ error: "Invalid or expired token" });
+            return res.status(401).json({ message: "Invalid or expired token" });
         }
     } else {
-        return res.status(401).json({ error: "No token provided" });
+        return res.status(401).json({ message: "No token provided" });
     }
 
     next();
