@@ -59,7 +59,11 @@ const UserSchema = new mongoose.Schema(
         },
         rsaPublicKey: {
             type: Object,
-        }
+        },
+        isBanned: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true,

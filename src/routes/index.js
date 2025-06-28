@@ -4,6 +4,7 @@ import chatRouter from './chat.routes.js';
 import usersRouter from './user.routes.js';
 import keysRouter from './keys.routes.js';
 import livekitRouter from './livekit.routes.js';
+import reportsRouter from './report.routes.js';
 
 const mainRouter = Router();
 
@@ -12,5 +13,6 @@ mainRouter.use('/chats', chatRouter);
 mainRouter.use('/users', usersRouter);
 mainRouter.use('/keys', keysRouter);
 mainRouter.use('/livekit', livekitRouter)
+mainRouter.use("/reports", reportsRouter)
 
 export default mainRouter;

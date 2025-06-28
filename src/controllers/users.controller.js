@@ -151,3 +151,15 @@ export const getUsersForDropdown = asyncHandler(async (req, res) => {
 
   return res.status(200).json({users});
 });
+
+export const banUser = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    // Only admin should access this in real app
+    const user = await User.findById(userId);
+    if (!user) {
+        return res.status(404).json({ message: "User not found." });
+    }
+    user.isBanned = true;
+    await user.save();
+    res.status(200).json({ message: "User has been banned.", user });
+});
