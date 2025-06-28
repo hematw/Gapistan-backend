@@ -14,6 +14,6 @@ usersRouter.put("/rsa-public-key", uploadRSAPublicKey);
 usersRouter.put("/:id", upload.single("profile"), updateUser)
 usersRouter.get("/:id/public-key", getPublicKey);
 usersRouter.get("/rsa-public-key", getPublicKey);
-usersRouter.patch("/ban/:userId", banUser);
+usersRouter.patch("/:userId/ban", banUser);
 
 export default usersRouter;

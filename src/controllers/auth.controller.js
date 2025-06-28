@@ -70,6 +70,10 @@ export const loginUser = asyncHandler(async (req, res) => {
     return res.status(401).json({ message: "Email or password was wrong!" });
   }
 
+  if (foundUser.isBanned) {
+    return res.status(403).json({ message: "Your account is BANNED for some reason." })
+  }
+
   if (!foundUser.verifiedAt) {
     return res
       .status(403)

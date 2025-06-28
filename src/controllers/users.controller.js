@@ -21,7 +21,9 @@ export const getUsers = asyncHandler(async (req, res) => {
         .sort({ createdAt: -1 })
         .select("-password")
         .lean();
-    return res.status(200).json({ users });
+
+    const total = await User.countDocuments(filter)
+    return res.status(200).json({ users, total });
 });
 
 export const createUser = asyncHandler(async (req, res) => {
@@ -105,7 +107,7 @@ export const uploadPublicKey = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: "publicKey missing required fields" });
     }
 
-    const user= await User.findByIdAndUpdate(req.user.id, { publicKey });
+    const user = await User.findByIdAndUpdate(req.user.id, { publicKey });
 
     if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -117,9 +119,9 @@ export const uploadPublicKey = asyncHandler(async (req, res) => {
 
 // GET /users/:id/public-key
 export const getPublicKey = asyncHandler(async (req, res) => {
-    const {id} = req.params;
-    if(!id){
-        return res.status(400).json({message: "User ID is required"});
+    const { id } = req.params;
+    if (!id) {
+        return res.status(400).json({ message: "User ID is required" });
     }
     const user = await User.findById(req.params.id).select("publicKey");
 
@@ -130,26 +132,26 @@ export const getPublicKey = asyncHandler(async (req, res) => {
 });
 
 export const uploadRSAPublicKey = asyncHandler(async (req, res) => {
-  const { rsaPublicKey } = req.body;
+    const { rsaPublicKey } = req.body;
 
-  if (!rsaPublicKey) {
-    return res.status(400).json({ message: "RSA public key missing" });
-  }
+    if (!rsaPublicKey) {
+        return res.status(400).json({ message: "RSA public key missing" });
+    }
 
-  const user = await User.findById(req.user.id);
-  user.rsaPublicKey = rsaPublicKey;
-  await user.save();
+    const user = await User.findById(req.user.id);
+    user.rsaPublicKey = rsaPublicKey;
+    await user.save();
 
-  res.json({ success: true });
+    res.json({ success: true });
 });
 
 export const getUsersForDropdown = asyncHandler(async (req, res) => {
-  const users = await User.find({_id: { $ne: req.user.id } })
-    .select("username email firstName lastName")
-    .sort({ createdAt: -1 })
-    .lean();
+    const users = await User.find({ _id: { $ne: req.user.id } })
+        .select("username email firstName lastName")
+        .sort({ createdAt: -1 })
+        .lean();
 
-  return res.status(200).json({users});
+    return res.status(200).json({ users });
 });
 
 export const banUser = asyncHandler(async (req, res) => {
