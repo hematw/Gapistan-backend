@@ -32,11 +32,12 @@ export default function initSocket(server) {
             console.log(eventName, args);
         });
 
-        socket.on('start-call', ({ toUserId, fromUserId, roomName, isGroup }) => {
+        socket.on('start-call', ({ toUserId, fromUserId, roomName, isGroup, from }) => {
             if (isGroup) {
                 socket.to(roomName).emit('incoming-call', {
                     fromUserId,
                     roomName,
+                    from,
                 });
             } else {
 
@@ -46,6 +47,7 @@ export default function initSocket(server) {
                     targetSocketId.emit('incoming-call', {
                         fromUserId,
                         roomName,
+                        from,
                     });
                 }
             }

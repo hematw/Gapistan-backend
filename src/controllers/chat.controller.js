@@ -639,6 +639,7 @@ export const leaveGroup = asyncHandler(async (req, res) => {
     }
     const events = [];
     chat.members = chat.members.filter((member) => member.toString() !== userId);
+    chat.groupAdmins = chat.groupAdmins.filter((member) => member.toString() !== userId);
     await chat.save();
     const memberSocket = userSockets[userId.toString()];
     if (memberSocket) {

@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
 const authHandler = (
     req,
@@ -31,11 +32,13 @@ const authHandler = (
     next();
 };
 
-export function isAdmin(req, res, next) {
-  if (req.user && req.user.isAdmin) {
-    return next();
-  }
-  return res.status(403).json({ message: "Access denied. Admins only." });
+export async function isAdmin(req, res, next) {
+    console.log(req.user);
+    const user = await User.findById(req.user.id);
+    if (user && user.isAdmin) {
+        return next();
+    }
+    return res.status(403).json({ message: "Access denied. Admins only." });
 };
 
 export default authHandler;
