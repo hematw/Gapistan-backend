@@ -13,7 +13,13 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
 export default function initSocket(server) {
     if (!io) {
         io = new IOServer(server, {
-            cors: { origin: allowedOrigins },
+            cors:
+             {
+                origin: "*", // or  for dev
+                methods: ["GET", "POST"],
+                credentials: true,
+                //  origin: allowedOrigins 
+            },
         });
     }
 
@@ -24,7 +30,7 @@ export default function initSocket(server) {
         socket.on("message", (...args) => handleMessage(socket, ...args));
         socket.on("disconnect", () => handleDisconnect(socket));
         socket.on("user-online", (...args) => handleUserOnline(socket, ...args));
-        socket.on("mark-as-seen", (...args) => handleMarsAsSeen(socket, ...args));
+        socket.on("mark-as-seen", (...args) => handleMarkAsSeen(socket, ...args));
         socket.on("send-message", (...args) => handleSendMessage(socket, ...args));
         socket.on("message-delivered", (...args) => handleMessageDelivery(socket, ...args));
         socket.on("message-seen", (...args) => handleMessageSeen(socket, ...args));
@@ -169,7 +175,7 @@ const handleUserOnline = async (socket, { userId, isOnline }) => {
     }
 }
 
-const handleMarsAsSeen = async (socket, { chatId, userId }) => {
+const handleMarkAsSeen = async (socket, { chatId, userId }) => {
     try {
         const messagesToUpdate = await Message.find({
             chat: chatId,
