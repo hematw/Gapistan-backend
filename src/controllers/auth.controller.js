@@ -112,14 +112,14 @@ export const verifyOtp = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: email, otp: +otp });
 
   if (!user) {
-    return res.status(401).json({ message: "Verification failed" });
+    return res.status(400).json({ message: "Verification failed" });
   }
 
   console.log(user.otpExpiry - Date.now());
   const isExpired = user.otpExpiry - Date.now() < 0;
 
   if (isExpired) {
-    return res.status(401).json({ message: "OTP Expired" });
+    return res.status(400).json({ message: "OTP Expired" });
   }
   user.verifiedAt = Date.now();
   await user.save();
