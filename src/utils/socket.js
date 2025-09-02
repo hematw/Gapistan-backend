@@ -272,7 +272,7 @@ const handleSendMessage = async (socket,
             chat: chatToSendMessage._id,
             text,
             files: files.map((file) => file._id),
-            replyTo,
+            replyTo: replyTo?._id,
             reactions: reactions || [],
             iv: iv
         });
@@ -288,6 +288,7 @@ const handleSendMessage = async (socket,
                 isYou: false,
                 sender: sender || senderId,
                 files,
+                replyTo
             })
         } else {
             let otherUser = chatToSendMessage.members.find(
@@ -304,6 +305,7 @@ const handleSendMessage = async (socket,
                     isYou: false,
                     sender: sender || senderId,
                     files,
+                    replyTo
                 });
             } else {
                 console.log(`${otherUser._id} is offline `, "💀💀💀");
@@ -317,6 +319,7 @@ const handleSendMessage = async (socket,
                 isYou: true,
                 sender: sender || senderId,
                 files,
+                replyTo
             },
         });
     } catch (error) {

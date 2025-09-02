@@ -17,9 +17,9 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["http://local
 
 app.use(
   cors({
-    // origin: allowedOrigins,
-    origin: "*",
+    origin: allowedOrigins,
     credentials: true,
+    // origin: "*",
   })
 );
 
