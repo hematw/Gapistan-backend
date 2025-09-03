@@ -421,8 +421,7 @@ export const uploadFiles = async (req, res) => {
 
 export const createGroup = asyncHandler(async (req, res) => {
     const { chatName, members } = req.body;
-
-    if (!chatName || members.length < 2) {
+    if (!chatName || !Array.isArray(members) || members.length < 2) {
         return res
             .status(400)
             .json({ message: "Group needs a name and at least 3 members" });
