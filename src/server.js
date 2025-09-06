@@ -19,6 +19,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
+    // origin: "*",
   })
 );
 
@@ -37,7 +38,7 @@ app.get("/secure", authHandler, (req, res) => {
   res.send("This route was really secure!");
 });
 
-app.use("/api", mainRouter)
+app.use("/api/v1", mainRouter)
 
 app.use(errorHandler)
 
@@ -46,7 +47,7 @@ const io = initSocket(server)
 
 const port = process.env.PORT || 3000;
 
-server.listen(port, async () => {
+server.listen(port, "0.0.0.0", async () => {
   await connectDB(process.env.MONGO_URI);
   console.log(`🚀 Server & WebSocket running on port ${port}!`);
 });
