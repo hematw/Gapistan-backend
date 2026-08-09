@@ -2,6 +2,7 @@ import { Server as IOServer } from "socket.io";
 import User from "../models/User.js";
 import Chat from "../models/Chat.js";
 import Message from "../models/Message.js";
+import { getDefaultChatE2EE } from "../config/e2ee.js";
 
 let io = null;
 export const userSockets = {};
@@ -233,7 +234,10 @@ const handleSendMessage = async (socket,
                 {
                     members: [senderId, receiverId],
                 },
-                { members: [senderId, receiverId] },
+                {
+                    members: [senderId, receiverId],
+                    e2eeEnabled: getDefaultChatE2EE(),
+                },
             );
             console.log(chatToSendMessage)
             chatToSendMessage = doc;

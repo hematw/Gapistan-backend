@@ -9,6 +9,7 @@ import { io, userSockets } from "../utils/socket.js";
 import generateEventMessage from "../utils/generateEventMessage.js";
 import { webcrypto as crypto } from "crypto";
 import EncryptedChatKey from "../models/EncryptedChatKey.js";
+import { getDefaultChatE2EE, isGlobalE2EEEnabled } from "../config/e2ee.js";
 
 // await Event.create({
 //     type: "user_joined",
@@ -394,9 +395,10 @@ export const uploadFiles = async (req, res) => {
 
             if (!chat) {
                 const { receiver } = req.query;
-                const newChat = await Chat.findOrCreate({
-                    members: [sender, receiver],
-                });
+                const newChat = await Chat.findOrCreate(
+                    { members: [sender, receiver] },
+                    { members: [sender, receiver], e2eeEnabled: getDefaultChatE2EE() },
+                );
             }
 
             filesToSave.push({
@@ -784,5 +786,54 @@ export const editGroupChat = asyncHandler(async (req, res) => {
         message: "Group chat updated successfully.",
         chat: updatedChat,
         events: [event]
+    });
+});
+
+export const toggleChatE2EE = asyncHandler(async (req, res) => {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    const { e2eeEnabled } = req.body;
+
+    if (typeof e2eeEnabled !== "boolean") {
+        return res.status(400).json({ message: "e2eeEnabled must be a boolean" });
+    }
+
+    if (!isGlobalE2EEEnabled() && e2eeEnabled) {
+        return res.status(400).json({
+            message: "E2EE is disabled globally (E2EE_ENABLED=false)",
+        });
+    }
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+
+    if (!chat.members.some((m) => m.toString() === userId)) {
+        return res.status(403).json({ message: "You are not a member of this chat." });
+    }
+
+    if (chat.isGroup && !chat.groupAdmins.some((a) => a.toString() === userId)) {
+        return res.status(403).json({
+            message: "Only group admins can change encryption settings.",
+        });
+    }
+
+    chat.e2eeEnabled = e2eeEnabled;
+    await chat.save();
+
+    const updatedChat = await Chat.findById(chatId).lean();
+
+    io.to(chatId).emit("e2ee-updated", {
+        chatId,
+        e2eeEnabled,
+        chat: updatedChat,
+    });
+
+    res.status(200).json({
+        message: e2eeEnabled
+            ? "End-to-end encryption enabled for this chat."
+            : "End-to-end encryption disabled for this chat.",
+        chat: updatedChat,
     });
 });

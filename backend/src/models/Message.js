@@ -24,9 +24,6 @@ const messageSchema = new Schema(
     },
     iv: {
       type: [Number],
-      required: function () {
-        return typeof this.text === "string" && this.text.trim().length > 0;
-      },
     },
     fileIv: { type: String },
   },

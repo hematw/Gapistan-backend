@@ -27,7 +27,11 @@ const ChatSchema = new Schema({
     },
     profile: {
         type: String,
-    }
+    },
+    e2eeEnabled: {
+        type: Boolean,
+        default: true,
+    },
 }, {
     timestamps: true,
 })
