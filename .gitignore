@@ -1,4 +1,24 @@
-node_modules
-.env
-public
+# Dependencies
+node_modules/
 
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Uploads (backend)
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
